@@ -479,13 +479,33 @@ async def get_historical_keeper_picks(
     db: AsyncSession = Depends(get_db),
     _: str = Depends(_verify_token),
 ):
-    """Returns all keeper picks for a season with their franchise-tag status."""
+    """Returns all keeper picks for a season with their franchise-tag status.
+    Uses previous season's week-14 rosters as source of truth — more reliable
+    than the is_keeper flag, which Yahoo sometimes omits for valid keeper picks.
+    """
+    # Collect numeric player IDs that appeared on any week-14 roster the prior season
+    prev_roster_result = await db.execute(
+        select(RosterSnapshot.player_key).where(RosterSnapshot.season == season - 1)
+    )
+    prev_player_ids = {
+        k.split(".p.")[-1]
+        for k in prev_roster_result.scalars().all()
+        if k and ".p." in k
+    }
+
+    # Fetch all picks for this season that have a player assigned
     picks_result = await db.execute(
         select(DraftPick)
-        .where(DraftPick.season == season, DraftPick.is_keeper == True)  # noqa: E712
+        .where(DraftPick.season == season, DraftPick.player_key.isnot(None))
         .order_by(DraftPick.round_number, DraftPick.pick_number)
     )
-    picks = picks_result.scalars().all()
+    all_picks = picks_result.scalars().all()
+
+    # Keep only picks where the player was on a prior-season roster (i.e. a keeper)
+    picks = [
+        p for p in all_picks
+        if p.player_key and p.player_key.split(".p.")[-1] in prev_player_ids
+    ]
 
     player_result = await db.execute(select(Player))
     players_by_key = {p.player_key: p for p in player_result.scalars().all()}

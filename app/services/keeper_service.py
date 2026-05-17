@@ -8,9 +8,9 @@ Rules summary (2026 draft):
   - Only drafted players (drafted picks in any season 2022-2025, including those
     later dropped and re-picked up — original draft year is preserved)
   - Round 1 original picks are NEVER eligible
-  - Keep round = original_draft_round - years_since_original_draft
+  - Keep round = original_draft_round - (times_previously_kept + 1)
   - Keep round must be >= 2 (can't cost a 1st-round pick)
-  - Max 4 years of keeping (5 total seasons on roster since original draft)
+  - Max 4 keeps (5 total seasons: original draft + 4 keeper picks)
   - Kickers (K) and Defenses (DEF) ineligible
 
   Franchise tags
@@ -81,15 +81,13 @@ def adp_rank_to_franchise_round(adp_rank: int) -> int:
     return _ADP_ROUND_DEFAULT
 
 
-def keeper_round(original_draft_round: int, original_draft_year: int, upcoming_season: int) -> Optional[int]:
+def keeper_round(original_draft_round: int, years_since: int) -> Optional[int]:
     """
-    Returns the round this player would cost as a regular keeper in upcoming_season,
-    or None if ineligible.
+    Returns the round this player would cost as a regular keeper, or None if ineligible.
+    years_since = times previously kept + 1 (counts this upcoming keep).
     """
-    years_since = upcoming_season - original_draft_year
-
     if years_since > settings.max_keeper_years:
-        return None  # exceeded 5-year total roster limit
+        return None  # exceeded 4-keep maximum
 
     if original_draft_round == 1:
         return None  # 1st-round picks never keepable
@@ -105,16 +103,14 @@ def keeper_round(original_draft_round: int, original_draft_year: int, upcoming_s
 # Original draft resolution
 # ---------------------------------------------------------------------------
 
-async def _get_original_draft(player_key: str, db: AsyncSession) -> Optional[tuple[int, int]]:
+async def _get_original_draft(player_key: str, db: AsyncSession) -> Optional[tuple[int, int, int]]:
     """
-    Returns (original_draft_year, original_draft_round) for a player,
-    checking historical overrides first, then Yahoo draft data.
+    Returns (original_draft_year, original_draft_round, times_kept) for a player.
+    times_kept = number of is_keeper=True draft picks after the original draft year.
     Returns None if player was never drafted in this league.
 
-    Yahoo's is_keeper flag is unreliable (often 0 even for keeper picks) and
-    player_key prefixes change each season (e.g. 449.p.40993 → 461.p.40993).
-    We normalise by matching on the numeric player ID suffix and take the
-    earliest draft pick across all seasons — that's always the original draft.
+    Player key prefixes change each season (e.g. 449.p.40993 → 461.p.40993),
+    so we match on the numeric suffix across all seasons.
     """
     # 1. Check manual overrides
     result = await db.execute(
@@ -125,14 +121,19 @@ async def _get_original_draft(player_key: str, db: AsyncSession) -> Optional[tup
     overrides = result.scalars().all()
     if overrides:
         earliest = overrides[0]
-        return earliest.original_draft_year, earliest.original_draft_round
+        # For overrides, fall through to count actual keeper picks below
+        override_year, override_round = earliest.original_draft_year, earliest.original_draft_round
+        player_id_str = player_key.split(".p.")[-1]
+        result2 = await db.execute(
+            select(DraftPick)
+            .where(DraftPick.player_key.like(f"%.p.{player_id_str}"))
+            .order_by(DraftPick.season.asc())
+        )
+        all_picks = result2.scalars().all()
+        times_kept = sum(1 for p in all_picks if p.is_keeper and p.season > override_year)
+        return override_year, override_round, times_kept
 
-    # 2. Normalise player key to numeric suffix ("461.p.40993" → "40993")
-    #    so we match picks from any season regardless of game-key prefix.
-    #    Yahoo's is_keeper flag is unreliable (often always 0), so we infer
-    #    whether each pick is a keeper by checking if its round matches the
-    #    expected keeper cost given the current origin.  If it doesn't match,
-    #    the player was dropped and re-drafted fresh — reset the clock.
+    # 2. Normalise to numeric player ID suffix so cross-season key changes don't break lookups.
     player_id_str = player_key.split(".p.")[-1]
 
     result = await db.execute(
@@ -149,10 +150,13 @@ async def _get_original_draft(player_key: str, db: AsyncSession) -> Optional[tup
 
     for pick in picks[1:]:
         if not pick.is_keeper:
-            # Not flagged as a keeper pick — player was released and re-drafted fresh
+            # Fresh re-draft — reset the origin clock
             orig_year, orig_round = pick.season, pick.round_number
 
-    return orig_year, orig_round
+    # Count explicit keeper picks after the original draft year
+    times_kept = sum(1 for p in picks if p.is_keeper and p.season > orig_year)
+
+    return orig_year, orig_round, times_kept
 
 
 async def _was_franchise_tagged_last_season(player_key: str, db: AsyncSession) -> bool:
@@ -252,15 +256,27 @@ async def _calculate_for_team(team: Team, upcoming: int, prev: int, db: AsyncSes
             if draft_info is None:
                 inelig_reason = "Undrafted — use Franchise Tag if eligible"
             else:
-                orig_year, orig_round = draft_info
-                years_since = upcoming - orig_year
+                orig_year, orig_round, times_kept = draft_info
+                # years_since counts this upcoming keep; only explicit keeper picks
+                # accumulate the cost — calendar years don't tick it down.
+                years_since = times_kept + 1
 
-                if orig_round == 1:
+                # Player must appear in the previous season's draft to maintain
+                # keeper eligibility. Missing a year breaks the chain entirely.
+                prev_pick_res = await db.execute(
+                    select(DraftPick).where(
+                        DraftPick.player_key.like(f"%.p.{player_id_str}"),
+                        DraftPick.season == prev,
+                    )
+                )
+                if prev_pick_res.scalar_one_or_none() is None:
+                    inelig_reason = "Not in last season's draft — franchise tag only"
+                elif orig_round == 1:
                     inelig_reason = "Originally a 1st-round pick — never keepable"
                 elif years_since > settings.max_keeper_years:
-                    inelig_reason = f"Exceeded 5-year roster maximum ({orig_year} draft)"
+                    inelig_reason = f"Exceeded 4-keep maximum ({orig_year} draft)"
                 else:
-                    rd = keeper_round(orig_round, orig_year, upcoming)
+                    rd = keeper_round(orig_round, years_since)
                     if rd is None:
                         inelig_reason = f"Keep would cost a 1st-round pick (drafted Rd {orig_round} in {orig_year})"
                     else:
@@ -333,9 +349,6 @@ async def get_team_keeper_summary(team_key: str, db: AsyncSession) -> dict:
         )
     )
     all_rows = eligibility_result.scalars().all()
-
-    # times_kept is derived from years_since_draft rather than is_keeper flags
-    # because Yahoo's is_keeper field is unreliable (often always 0).
 
     # Load franchise tags set by admin for upcoming season
     ft_result = await db.execute(

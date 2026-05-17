@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — The Years Fantasy</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    .admin-layout { max-width: 960px; margin: 0 auto; padding: 24px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+    .card-title { font-size: 1rem; font-weight: 700; margin-bottom: 14px; }
+    .input-group { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+    input[type=password], input[type=text], input[type=number], select, textarea {
+      background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+      padding: 9px 12px; border-radius: var(--radius-sm); font-size: 0.9rem; flex: 1; min-width: 180px;
+    }
+    input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+    .status-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+    .status-item { background: var(--surface-2); border-radius: var(--radius-sm); padding: 12px; }
+    .status-key { font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+    .status-val { font-size: 0.95rem; font-weight: 600; margin-top: 3px; word-break: break-all; }
+    .team-select-area { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+    .tag-row { display: flex; gap: 10px; align-items: center; padding: 10px 12px; background: var(--surface-2); border-radius: var(--radius-sm); margin-bottom: 6px; flex-wrap: wrap; }
+    .tag-remove { background: rgba(239,68,68,0.15); color: var(--ineligible); border: 1px solid rgba(239,68,68,0.3); border-radius: var(--radius-sm); padding: 3px 10px; font-size: 0.8rem; cursor: pointer; }
+    .tag-remove:hover { background: rgba(239,68,68,0.3); }
+    .add-tag-btn { background: rgba(108,99,255,0.15); color: var(--accent); border: 1px solid rgba(108,99,255,0.3); border-radius: var(--radius-sm); padding: 6px 14px; font-size: 0.85rem; cursor: pointer; }
+    .add-tag-btn:hover { background: rgba(108,99,255,0.25); }
+    .player-check { display: flex; gap: 8px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+    .player-check input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--franchise); flex-shrink: 0; }
+    .player-check label { flex: 1; cursor: pointer; font-size: 0.85rem; }
+    .player-check .round-info { font-size: 0.78rem; color: var(--text-muted); }
+    .msg { padding: 10px 14px; border-radius: var(--radius-sm); font-size: 0.85rem; margin-top: 10px; }
+    .msg.success { background: rgba(16,185,129,0.15); color: var(--keeper); }
+    .msg.error { background: rgba(239,68,68,0.12); color: var(--ineligible); }
+    #login-screen { display: flex; align-items: center; justify-content: center; min-height: 80vh; }
+    .login-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; max-width: 360px; width: 100%; }
+    #admin-content { display: none; }
+    .tab-bar { margin-bottom: 20px; }
+    .import-area { font-family: monospace; font-size: 0.8rem; width: 100%; min-height: 160px; resize: vertical; }
+    .val-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .val-table th { background: var(--surface-2); color: var(--text-muted); text-align: left; padding: 7px 10px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .val-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: top; word-break: break-word; max-width: 220px; }
+    .val-table tr:hover td { background: var(--surface-2); }
+    .val-badge-keeper { background: rgba(16,185,129,0.15); color: var(--keeper); padding: 1px 7px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; }
+    .trade-row { display: flex; gap: 10px; align-items: center; padding: 8px 12px; background: var(--surface-2); border-radius: var(--radius-sm); margin-bottom: 6px; flex-wrap: wrap; font-size: 0.85rem; }
+    .draft-order-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+    .draft-order-slot { display: flex; align-items: center; gap: 8px; background: var(--surface-2); border-radius: var(--radius-sm); padding: 8px 12px; }
+    .draft-order-pos { font-size: 1rem; font-weight: 700; color: var(--accent); width: 28px; flex-shrink: 0; text-align: center; }
+    .draft-order-select { flex: 1; min-width: 0; }
+  </style>
+</head>
+<body>
+
+<header class="site-header">
+  <div>
+    <div class="site-title">The Years Fantasy</div>
+    <div class="site-subtitle">Admin Panel</div>
+  </div>
+  <div class="status-bar">
+    <a href="/" class="badge badge-purple" style="text-decoration:none">← Public Site</a>
+    <button class="btn btn-danger" id="logout-btn" style="display:none;padding:6px 14px;font-size:0.8rem">Logout</button>
+  </div>
+</header>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="site-title" style="font-size:1.2rem;margin-bottom:8px">Admin Login</div>
+    <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">Enter your admin password to continue.</p>
+    <div class="input-group">
+      <input type="password" id="login-pw" placeholder="Password" />
+    </div>
+    <button class="btn btn-primary" id="login-btn" style="width:100%">Login</button>
+    <div id="login-msg"></div>
+  </div>
+</div>
+
+<!-- ADMIN CONTENT -->
+<div id="admin-content">
+  <div class="admin-layout">
+
+    <!-- System Status -->
+    <div class="card">
+      <div class="card-title">System Status</div>
+      <div class="status-grid" id="status-grid">
+        <div class="loading-state" style="padding:16px;grid-column:1/-1"><div class="spinner"></div></div>
+      </div>
+      <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+        <a href="/setup/authorize" class="btn btn-primary" style="font-size:0.85rem;padding:8px 16px">Re-authorize Yahoo</a>
+        <button class="btn btn-primary" id="run-etl-btn" style="font-size:0.85rem;padding:8px 16px">Run Initial ETL</button>
+        <button class="btn btn-primary" id="recalc-btn" style="font-size:0.85rem;padding:8px 16px">Recalculate Keepers</button>
+        <button class="btn btn-primary" id="import-pick-trades-btn" style="font-size:0.85rem;padding:8px 16px">Import Pick Trades</button>
+      </div>
+      <div id="etl-msg"></div>
+    </div>
+
+    <!-- Historical League IDs -->
+    <div class="card">
+      <div class="card-title">Historical League IDs</div>
+      <p style="color:var(--text-muted);font-size:0.83rem;margin-bottom:14px">
+        Yahoo creates a new league each season with a different ID. Add the league IDs for previous seasons
+        so draft picks and transactions can be imported. Find them in the Yahoo URL:
+        <code>football.fantasysports.yahoo.com/&lt;year&gt;/f1/&lt;league-id&gt;</code>
+      </p>
+      <div class="input-group" style="align-items:center">
+        <input type="number" id="hist-season" placeholder="Season (e.g. 2024)" min="2015" max="2030" style="width:140px;flex:0" />
+        <input type="text" id="hist-league-id" placeholder="League ID (e.g. 189974)" style="flex:1;min-width:140px" />
+        <button class="btn btn-primary" id="hist-save-btn" style="flex:0;white-space:nowrap;padding:8px 14px;font-size:0.85rem">Save</button>
+      </div>
+      <div id="hist-msg"></div>
+      <div style="margin-top:14px" id="hist-list"></div>
+    </div>
+
+    <!-- Franchise Tag Management -->
+    <div class="card">
+      <div class="card-title">Franchise Tag Management</div>
+      <p style="color:var(--text-muted);font-size:0.83rem;margin-bottom:14px">
+        Mark players as franchise tagged. This affects keeper slot availability and draft board display.
+        Franchise-tagged players from the previous season cannot be re-franchised unless they were dropped in-season.
+      </p>
+
+      <div class="team-select-area">
+        <label for="ft-team-select" style="color:var(--text-muted);font-size:0.85rem">Team:</label>
+        <select id="ft-team-select" style="min-width:200px;flex:0"></select>
+        <button class="btn btn-primary" id="load-team-btn" style="padding:8px 16px;font-size:0.85rem">Load Roster</button>
+      </div>
+
+      <div id="ft-roster-area"></div>
+      <div id="ft-msg"></div>
+    </div>
+
+    <!-- Draft Order -->
+    <div class="card">
+      <div class="card-title">Draft Order — <span id="draft-order-season" style="color:var(--text-muted);font-weight:400"></span></div>
+      <p style="color:var(--text-muted);font-size:0.83rem;margin-bottom:14px">
+        Set the snake draft order. Position 1 picks first overall. Each team must appear exactly once.
+      </p>
+      <div id="draft-order-area">
+        <div class="loading-state" style="padding:16px"><div class="spinner"></div></div>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" id="save-draft-order-btn" style="font-size:0.85rem;padding:8px 16px">Save Draft Order</button>
+        <button class="btn" id="clear-draft-order-btn" style="font-size:0.85rem;padding:8px 16px;background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border)">Clear Order</button>
+      </div>
+      <div id="draft-order-msg"></div>
+    </div>
+
+    <!-- Pick Trades -->
+    <div class="card">
+      <div class="card-title">Pick Trades</div>
+      <p style="color:var(--text-muted);font-size:0.83rem;margin-bottom:14px">
+        Record traded draft picks. The pick slot stays in the original team's column on the draft board, but displays the new owner's color.
+      </p>
+
+      <div class="input-group" style="align-items:center">
+        <select id="trade-orig-team" style="flex:1;min-width:140px" title="Original pick owner"></select>
+        <span style="color:var(--text-muted);padding:0 4px">Rd</span>
+        <select id="trade-round" style="width:80px;flex:0">
+          <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+          <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+          <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+          <option value="10">10</option><option value="11">11</option><option value="12">12</option>
+          <option value="13">13</option><option value="14">14</option><option value="15">15</option>
+          <option value="16">16</option>
+        </select>
+        <span style="color:var(--text-muted);padding:0 4px">→</span>
+        <select id="trade-new-owner" style="flex:1;min-width:140px" title="New pick owner"></select>
+        <button class="btn btn-primary" id="add-trade-btn" style="flex:0;white-space:nowrap;padding:8px 14px;font-size:0.85rem">Add Trade</button>
+      </div>
+      <div id="trade-msg"></div>
+
+      <div style="margin-top:14px">
+        <div style="font-size:0.8rem;color:var(--text-dim);margin-bottom:8px">Current traded picks:</div>
+        <div id="trades-list"><div style="color:var(--text-dim);font-size:0.82rem">No traded picks recorded.</div></div>
+      </div>
+    </div>
+
+    <!-- Data Validation -->
+    <div class="card">
+      <div class="card-title">Data Validation</div>
+      <p style="color:var(--text-muted);font-size:0.83rem;margin-bottom:14px">
+        Browse raw data by season to verify ETL results.
+      </p>
+      <div class="input-group" style="align-items:center;flex-wrap:wrap">
+        <label style="color:var(--text-muted);font-size:0.85rem;white-space:nowrap">Season:</label>
+        <input type="number" id="val-season" value="2025" min="2018" max="2030" style="width:100px;flex:0" />
+        <button class="btn btn-primary" id="val-draft-btn" style="padding:8px 14px;font-size:0.85rem">Draft Picks</button>
+        <button class="btn btn-primary" id="val-txn-btn" style="padding:8px 14px;font-size:0.85rem">All Transactions</button>
+        <button class="btn btn-primary" id="val-trade-btn" style="padding:8px 14px;font-size:0.85rem;background:rgba(245,158,11,0.7)">Trades Only</button>
+        <button class="btn btn-primary" id="val-roster-btn" style="padding:8px 14px;font-size:0.85rem">Rosters</button>
+        <button class="btn btn-primary" id="val-adp-btn" style="padding:8px 14px;font-size:0.85rem;background:rgba(99,102,241,0.7)">ADP Matching</button>
+      </div>
+      <div id="val-output" style="margin-top:12px;overflow-x:auto"></div>
+    </div>
+
+    <!-- Historical Franchise Tags -->
+    <div class="card">
+      <div class="card-title">Historical Franchise Tags</div>
+      <p style="color:var(--text-muted);font-size:0.83rem;margin-bottom:14px">
+        Mark which keeper picks from past seasons were actually franchise tags.
+        A player franchise-tagged in season Y is completely ineligible to keep in season Y+1.
+      </p>
+      <div class="input-group" style="align-items:center">
+        <select id="hft-season-select" style="width:120px;flex:0">
+          <option value="2025">2025</option>
+          <option value="2024">2024</option>
+          <option value="2023">2023</option>
+          <option value="2022">2022</option>
+        </select>
+        <button class="btn btn-primary" id="hft-load-btn" style="flex:0;padding:8px 16px;font-size:0.85rem">Load Keeper Picks</button>
+      </div>
+      <div id="hft-list" style="margin-top:14px"></div>
+      <div id="hft-msg"></div>
+    </div>
+
+    <!-- Historical Keeper Import -->
+    <div class="card">
+      <div class="card-title">Historical Keeper Import</div>
+      <p style="color:var(--text-muted);font-size:0.83rem;margin-bottom:14px">
+        Import historical keeper records for players whose original draft year/round can't be determined
+        from Yahoo data alone. Paste a JSON array below. Each entry: <code>{ season, player_key, team_key, original_draft_year, original_draft_round, was_franchise_tagged, notes }</code>
+      </p>
+      <textarea class="import-area" id="import-json" placeholder='[{"season":2023,"player_key":"423.p.12345","team_key":"423.l.179398.t.1","original_draft_year":2021,"original_draft_round":5,"was_franchise_tagged":false}]'></textarea>
+      <div style="margin-top:10px">
+        <button class="btn btn-primary" id="import-btn">Import Records</button>
+      </div>
+      <div id="import-msg"></div>
+
+      <div style="margin-top:20px">
+        <div class="card-title" style="font-size:0.9rem">Existing Overrides</div>
+        <div id="overrides-list"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="/js/admin.js"></script>
+</body>
+</html>

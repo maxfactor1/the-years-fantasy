@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Years Fantasy — Keeper Board</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+<header class="site-header">
+  <div>
+    <div class="site-title">The Years Fantasy</div>
+    <div class="site-subtitle" id="season-label">Keeper Tracker</div>
+  </div>
+  <div class="status-bar">
+    <span class="badge badge-green">
+      <span>●</span> <span id="badge-keeper-label">Keeper</span>
+    </span>
+    <span class="badge badge-amber">
+      <span>★</span> <span id="badge-ft-label">Franchise Tag</span>
+    </span>
+    <div class="last-updated" id="last-updated">Updating…</div>
+  </div>
+</header>
+
+<nav class="tab-bar" role="tablist">
+  <button class="tab-btn active" data-tab="teams" role="tab">Teams</button>
+  <button class="tab-btn" data-tab="board" role="tab">Draft Board</button>
+</nav>
+
+<!-- ── Teams tab ── -->
+<div class="tab-panel active" id="tab-teams">
+  <div id="teams-container">
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <div>Loading teams…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Draft Board tab ── -->
+<div class="tab-panel" id="tab-board">
+  <div id="board-container">
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <div>Loading draft board…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Team detail modal ── -->
+<div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <div class="team-logo-placeholder" id="modal-logo">?</div>
+      <div>
+        <div class="modal-title" id="modal-team-name">Team</div>
+        <div class="site-subtitle" id="modal-manager">Manager</div>
+      </div>
+      <button class="modal-close" id="modal-close" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body">
+      <div class="loading-state"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+</body>
+</html>

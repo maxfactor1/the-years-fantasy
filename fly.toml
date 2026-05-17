@@ -1,0 +1,43 @@
+app = "theyearsfantasy"
+primary_region = "ord"  # Chicago — change to "ewr" (NY), "dfw" (Dallas), etc.
+
+[build]
+
+[env]
+  DATABASE_URL = "sqlite+aiosqlite:////data/fantasy.db"
+  YAHOO_LEAGUE_ID = "179398"
+  YAHOO_PREVIOUS_SEASON = "2025"
+  YAHOO_UPCOMING_SEASON = "2026"
+  PORT = "8000"
+
+[mounts]
+  source = "fantasy_data"
+  destination = "/data"
+
+[[services]]
+  internal_port = 8000
+  protocol = "tcp"
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
+    force_https = true
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443
+
+  [services.concurrency]
+    hard_limit = 25
+    soft_limit = 20
+    type = "connections"
+
+  [[services.http_checks]]
+    interval = "30s"
+    timeout = "10s"
+    grace_period = "30s"
+    method = "GET"
+    path = "/api/status"

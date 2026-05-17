@@ -144,8 +144,6 @@ function buildTeamCard(team, summary) {
   const tagged = new Set((summary?.franchise_tags_set) || []);
   const regularKeepers = (summary?.eligible_keepers || []).filter(p => !tagged.has(p.player_key));
   const taggedPlayers = (summary?.franchise_eligible || []).filter(p => tagged.has(p.player_key));
-  const maxCarryovers = summary?.max_carryovers ?? 4;
-  const usedSlots = regularKeepers.length + taggedPlayers.length;
 
   // Preview: up to 4 players (keepers first, then tagged FTs)
   const previewPlayers = [
@@ -178,12 +176,8 @@ function buildTeamCard(team, summary) {
         <div class="stat-label">Keepers</div>
       </div>
       <div class="stat-item">
-        <div class="stat-value amber">${taggedPlayers.length}</div>
+        <div class="stat-value amber">${(summary?.franchise_eligible || []).length}</div>
         <div class="stat-label">Fr. Tags</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-value" style="color:var(--text)">${usedSlots}/${maxCarryovers}</div>
-        <div class="stat-label">Slots Used</div>
       </div>
     </div>
     <div class="team-card-preview">${preview}</div>
@@ -236,21 +230,7 @@ function renderModalBody(bodyEl, s) {
 
   const total = regularKeepers.length + taggedPlayers.length;
 
-  // Cap-bar dots
-  const capDots = Array.from({ length: max_carryovers }, (_, i) => {
-    const used = i < total;
-    const isFT = i < taggedPlayers.length;
-    return `<span class="cap-dot ${used ? (isFT ? 'franchise' : 'keeper') : 'empty'}"></span>`;
-  }).join('');
-
-  let html = `
-    <div class="cap-bar">
-      ${capDots}
-      <span style="color:var(--text-muted);font-size:0.82rem">
-        ${total}/${max_carryovers} carry-over slots used
-        ${ft_keeper_penalty > 0 ? `<span style="color:var(--franchise)"> · ${ft_keeper_penalty} keeper slot${ft_keeper_penalty > 1 ? 's' : ''} forfeited for extra FT</span>` : ''}
-      </span>
-    </div>`;
+  let html = ``;
 
   // Section 1: Regular keepers (keeper-eligible, not franchise tagged)
   html += `<div class="section-header">Regular Keepers (${regularKeepers.length} eligible / ${available_keeper_slots} slots)</div>`;
@@ -272,14 +252,11 @@ function renderModalBody(bodyEl, s) {
     html += untaggedFT.map(p => playerRow(p, 'franchise-eligible')).join('');
   }
 
-  // Section 4: Ineligible (collapsed)
+  // Section 4: Ineligible (always expanded)
   if (ineligible.length > 0) {
     html += `
-      <div class="ineligible-toggle" onclick="this.nextElementSibling.classList.toggle('open');this.querySelector('.toggle-icon').textContent=this.nextElementSibling.classList.contains('open')?'▲':'▼'">
-        <span class="toggle-icon">▼</span>
-        <span>Ineligible players (${ineligible.length})</span>
-      </div>
-      <div class="ineligible-list">
+      <div class="section-header">Ineligible (${ineligible.length})</div>
+      <div>
         ${ineligible.map(p => playerRowIneligible(p)).join('')}
       </div>`;
   }

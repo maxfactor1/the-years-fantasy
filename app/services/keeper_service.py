@@ -216,11 +216,13 @@ async def _calculate_for_team(team: Team, upcoming: int, prev: int, db: AsyncSes
         position = player.position.upper() if player else "UNK"
         player_name = player.name_full if player else player_key
 
-        # Fetch ADP data
+        # Fetch ADP data — match on numeric player ID suffix so cross-season
+        # key prefix changes (e.g. 449.p.X → 461.p.X) don't break the lookup.
         adp: Optional[AdpData] = None
+        player_id_str = player_key.split(".p.")[-1]
         adp_result = await db.execute(
             select(AdpData).where(
-                AdpData.yahoo_player_key == player_key,
+                AdpData.yahoo_player_key.like(f"%.p.{player_id_str}"),
                 AdpData.season == upcoming,
             )
         )

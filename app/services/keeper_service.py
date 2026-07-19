@@ -294,11 +294,14 @@ async def _calculate_for_team(team: Team, upcoming: int, prev: int, db: AsyncSes
             inelig_reason is not None
             and inelig_reason.startswith("Keep would cost a 1st-round pick")
         )
+        _exceeded_max_years = years_since is not None and years_since > settings.max_keeper_years
 
         if position in INELIGIBLE_POSITIONS:
             franchise_inelig_reason = f"{position} cannot be franchise tagged"
         elif was_ft_last_season:
             franchise_inelig_reason = "Was franchise tagged last season — cannot re-franchise"
+        elif _exceeded_max_years:
+            franchise_inelig_reason = f"Exceeded 5-season roster maximum — cannot franchise tag"
         elif orig_round == 1:
             franchise_inelig_reason = "Originally a 1st-round pick — cannot franchise tag"
         elif _keep_cost_too_high:
